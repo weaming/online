@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Online Status Demo</title>
+</head>
+<body>
+    <p>This a websocket demonstration page.</p>
+    <script src="{{ static_url('js/online.js') }}"></script>
+    <script>
+    	var rewriteFunc = function(){
+    	    window.onlineWebsocket.onmessage = function(e) {
+				print(e.data);
+
+				try{ var data = JSON.parse(e.data); } catch(e){return;}
+
+				var ele = document.getElementsByClassName('onlineCount');
+				if (!ele.length){
+				    // add <p> at the bottom of <body>
+				    ele = [document.createElement('p')];
+				    ele[0].classList.add('onlineCount');
+				    document.body.appendChild(ele[0]);
+				}
+				for(var i=0, length=ele.length; i<length; i++){
+				    ele[i].innerHTML = '在线人数：' + data.client + '，系统总连接数：' + data.connect
+				    + '。刷新时间：' + new Date().toLocaleString();
+				}
+			};
+        }
+        document.addEventListener("DOMContentLoaded", rewriteFunc);
+    </script>
+</body>
+</html>
