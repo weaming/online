@@ -1,6 +1,7 @@
 import json
-from tornado import websocket, gen
+from tornado import websocket
 from util import DictPlus
+import user_agents as UA
 
 # better to save out of program
 # (ip, host, ua): n
@@ -10,7 +11,7 @@ count = {}
 connect_pool = []
 
 
-def get_count(type='connect', key=None):
+def get_count(type='all_connect', key=None):
     # FOR SITE STATUS =====
     # how many client for one site
     if type == 'client':
@@ -21,7 +22,7 @@ def get_count(type='connect', key=None):
         return rv
 
     # how many total connect for one site
-    if type == 'client_connect':
+    if type == 'site_connect':
         rv = 0
         for k, n in count.items():
             if k[1] == key[1]:
@@ -30,7 +31,7 @@ def get_count(type='connect', key=None):
 
     # FOR VISITOR STATUS =====
     # how many pages your current browser opened for one site
-    if type == 'page':
+    if type == 'client_site_connect':
         return count.get(key, 0)
 
     # FOR SYSTEM STATUS =====
@@ -40,7 +41,7 @@ def get_count(type='connect', key=None):
         return len(count)
 
     # how many websocket connect globally
-    if type == 'connect':
+    if type == 'all_connect':
         return sum(count.values())
 
     return -1
@@ -55,17 +56,18 @@ class EchoWebSocket(websocket.WebSocketHandler):
         ip = self.request.headers.get('X-Real-IP') or self.request.remote_ip
         host = self.request.headers.get('Origin', '')
         ua = self.request.headers.get('User-Agent')
-        return ip, host, ua
+        ua_parsed = UA.parse(ua)
+        return ip, host, ua, str(ua_parsed)
 
     def send_all(self, msg):
         for handler in connect_pool:
             if isinstance(msg, dict):
                 _msg = DictPlus(**msg) + dict(
                     # key=handler.key,
-                    page=get_count('page', key=handler.key),
                     client=get_count('client', key=handler.key),
-                    client_connect=get_count('client_connect', key=handler.key),
-                    connect=get_count('connect'),
+                    client_site_connect=get_count('client_site_connect', key=handler.key),
+                    site_connect=get_count('site_connect', key=handler.key),
+                    all_connect=get_count('all_connect'),
                 )
                 text = json.dumps(_msg, ensure_ascii=False)
             else:
@@ -75,7 +77,10 @@ class EchoWebSocket(websocket.WebSocketHandler):
     def sync_count(self, event=None):
         self.send_all(dict(
             event=event,
-            connect=get_count('connect'),
+            ip=self.key[0],
+            host=self.key[1],
+            ua=self.key[3],
+            all_connect=get_count('all_connect'),
         ))
 
     def check_origin(self, origin):
@@ -90,7 +95,10 @@ class EchoWebSocket(websocket.WebSocketHandler):
 
     def on_message(self, message):
         try:
-            self.write_message(u"You said: " + message)
+            if message.lower() == 'ping':
+                self.write_message('pong')
+            else:
+                self.write_message(u"You said: " + message)
         except websocket.WebSocketClosedError:
             self.on_close()
 

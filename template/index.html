@@ -1,33 +1,32 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
+  <head>
     <meta charset="UTF-8">
     <title>Online Status Demo</title>
-</head>
-<body>
+  </head>
+  <body>
     <p>This a websocket demonstration page.</p>
     <script src="{{ static_url('js/online.js') }}"></script>
     <script>
-    	var rewriteFunc = function(){
-    	    window.onlineWebsocket.onmessage = function(e) {
-				print(e.data);
+      var rewriteFunc = function(){
+        window.onlineWebsocket.onmessage = function(e) {
 
-				try{ var data = JSON.parse(e.data); } catch(e){return;}
+          try{ var data = JSON.parse(e.data); } catch(e){return;}
 
-				var ele = document.getElementsByClassName('onlineCount');
-				if (!ele.length){
-				    // add <p> at the bottom of <body>
-				    ele = [document.createElement('p')];
-				    ele[0].classList.add('onlineCount');
-				    document.body.appendChild(ele[0]);
-				}
-				for(var i=0, length=ele.length; i<length; i++){
-				    ele[i].innerHTML = '在线人数：' + data.client + '，系统总连接数：' + data.connect
-				    + '。刷新时间：' + new Date().toLocaleString();
-				}
-			};
-        }
-        document.addEventListener("DOMContentLoaded", rewriteFunc);
+          var ele = document.getElementsByClassName('onlineCount');
+          if (!ele.length){
+            // add <p> at the bottom of <body>
+            ele = [document.createElement('p')];
+            ele[0].classList.add('onlineCount');
+            document.body.appendChild(ele[0]);
+          }
+          for(var i=0, length=ele.length; i<length; i++){
+            ele[i].innerHTML = `在线人数: ${data.client}, 系统总连接数: ${data.all_connect},
+            打开网页: ${data.client_site_connect}. 刷新时间: ${new Date().toLocaleString()}`
+          }
+        };
+      }
+      document.addEventListener("DOMContentLoaded", rewriteFunc);
     </script>
-</body>
+  </body>
 </html>

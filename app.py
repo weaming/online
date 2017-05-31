@@ -22,5 +22,7 @@ def make_app(deubg=False):
 
 if __name__ == "__main__":
     app = make_app(deubg=True)
-    app.listen(9999)
+    port = 9999
+    app.listen(port)
+    print('http://localhost:%s' % port)
     ioloop.IOLoop.current().start()
