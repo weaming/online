@@ -8,7 +8,13 @@ import user_agents as UA
 count = {}
 
 # saved for sync information
-connect_pool = []
+connect_pool_dict = {}
+
+def get_admin_connect(domain='online.bitsflow.org'):
+    for host, connect_list in connect_pool_dict.items():
+        if domain in host:
+            return connect_list
+    return []
 
 
 def get_count(type='all_connect', key=None):
@@ -48,9 +54,6 @@ def get_count(type='all_connect', key=None):
 
 
 class EchoWebSocket(websocket.WebSocketHandler):
-    def prepare(self):
-        connect_pool.append(self)
-
     @property
     def key(self):
         ip = self.request.headers.get('X-Real-IP') or self.request.remote_ip
@@ -60,19 +63,28 @@ class EchoWebSocket(websocket.WebSocketHandler):
         return ip, host, ua, str(ua_parsed)
 
     def send_all(self, msg):
-        for handler in connect_pool:
+        self_host = self.key[1]
+        targets = connect_pool_dict.get(self_host, [])
+        targets += get_admin_connect()
+        targets = set(targets)
+
+        for handler in targets:
+            key = handler.key
             if isinstance(msg, dict):
                 _msg = DictPlus(**msg) + dict(
-                    # key=handler.key,
-                    client=get_count('client', key=handler.key),
-                    client_site_connect=get_count('client_site_connect', key=handler.key),
-                    site_connect=get_count('site_connect', key=handler.key),
+                    client=get_count('client', key=key),
+                    client_site_connect=get_count('client_site_connect', key=key),
+                    site_connect=get_count('site_connect', key=key),
                     all_connect=get_count('all_connect'),
                 )
                 text = json.dumps(_msg, ensure_ascii=False)
             else:
                 text = str(msg)
-            handler.write_message(text)
+            try:
+                handler.write_message(text)
+            except websocket.WebSocketClosedError:
+                pass
+
 
     def sync_count(self, event=None):
         self.send_all(dict(
@@ -90,7 +102,13 @@ class EchoWebSocket(websocket.WebSocketHandler):
     def open(self):
         count.setdefault(self.key, 0)
         count[self.key] += 1
+
+        self_host = self.key[1]
+        connect_pool_dict.setdefault(self_host, [])
+        connect_pool_dict[self_host].append(self)
+
         print("WebSocket from %s(%s) opened" % self.key[:2])
+
         self.sync_count('open')
 
     def on_message(self, message):
@@ -103,12 +121,17 @@ class EchoWebSocket(websocket.WebSocketHandler):
             self.on_close()
 
     def on_close(self):
-        if self in connect_pool:
-            connect_pool.remove(self)
+        self_host = self.key[1]
+        if self in connect_pool_dict[self_host]:
+            connect_pool_dict[self_host].remove(self)
 
-        count[self.key] -= 1
-        if count[self.key] < 1:
-            del count[self.key]
+        if self.key in count:
+            count[self.key] -= 1
+            if count[self.key] < 1:
+                del count[self.key]
 
         self.sync_count('close')
         print("WebSocket from %s(%s) closed" % self.key[:2])
+
+    def __repr__(self):
+        return '<ws: {0}, {1}, {3}>'.format(*self.key)
